@@ -1,8 +1,11 @@
 from scapy.all import ARP, Ether, srp 
 from tabulate import tabulate
+from datetime import datetime
 import ipaddress
 import socket
 import requests
+import csv
+
 
 def scan_network(network):
     arp = ARP(pdst=network)
@@ -49,10 +52,29 @@ def print_devices(devices):
         table.append([ip, mac, hostname, vendor])
 
     headers = ["IP Address", "MAC Address", "Hostname", "Vendor"]
-    print(tabulate(table, headers=headers, tablefmt="fancy_grid"))
+    print(tabulate(table, headers=headers, tablefmt="pretty"))
+
+def export_to_csv(devices, filename=None):
+    if filename is None: 
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"scan_{timestamp}.csv"
+
+    with open(filename, mode='w', newline='') as file: 
+        writer = csv.writer(file)
+        writer.writerow(["IP", "MAC", "Hostname", "Vendor"])
+        
+        for device in devices: 
+            ip = device['ip']
+            mac = device['mac']
+            hostname = get_hostname(ip)
+            vendor = get_vendor(mac)
+            writer.writerow([ip, mac, hostname, vendor])
+
+    print(f"\n[+] Scan results saved to {filename}")
 
 
 if __name__ == "__main__":
     target_range = "192.168.1.0/24"
     devices = scan_network(target_range)
     print_devices(devices)
+    export_to_csv(devices)

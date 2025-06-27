@@ -6,13 +6,14 @@ import socket
 import requests
 import csv
 
+vendor_cache = {}
 
 def scan_network(network):
     arp = ARP(pdst=network)
     ether = Ether(dst="ff:ff:ff:ff:ff:ff")
     packet = ether / arp
 
-    result = srp(packet, timeout=2, verbose=0)[0]
+    result = srp(packet, timeout=1, verbose=0)[0]
 
     devices = []
     for sent, received in result: 
@@ -22,24 +23,30 @@ def scan_network(network):
 
 def get_hostname(ip):
     try:
+        socket.setdefaulttimeout(1.0)
         return socket.gethostbyaddr(ip)[0]
-    except socket.herror: 
-        return "Unknown"
-    except Exception: 
+    except (socket.herror, socket.timeout, OSError): 
         return "Unknown"
     
 def get_vendor(mac):
-    url = f"https://api.maclookup.app/v2/macs/{mac}"
+    prefix = mac.upper().replace(':', '')[:6]
 
+    if prefix in vendor_cache: 
+        return vendor_cache[prefix]
+    
+    url = f"https://api.maclookup.app/v2/macs/{mac}"
     try: 
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=2)
         if response.status_code == 200: 
             data = response.json()
-            return data.get("company", "Unknown")
+            vendor = data.get("company", "Unknown")
         else: 
-            return "Unknown"
-    except: 
-        return "Unknown"
+            vendor = "Unknown"
+    except requests.RequestException: 
+        vendor = "Unknown"
+
+    vendor_cache[prefix] = vendor
+    return vendor
 
 
 def print_devices(devices):

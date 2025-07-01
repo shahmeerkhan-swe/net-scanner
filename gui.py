@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
 import json 
+import ipaddress
 from datetime import datetime 
 from tabulate import tabulate 
 import threading
@@ -48,10 +49,27 @@ def start_scan():
 
 def run_scan():
 
+    ip_range = ip_range_var.get().strip()
+    if not ip_range: 
+        ip_range = "192.168.1.0/24"
+
+    try:
+        ip_range_obj = ipaddress.ip_network(ip_range, strict=False)
+    except ValueError: 
+        root.after(0, lambda: messagebox.showerror(
+            "Invalid IP Range", "Please enter a valid CIDR IP Range (e.g., 192.168.1.0/24)."
+        ))
+        root.after(0, lambda: loading_label.config(state='normal'))
+        root.after(0, lambda: scan_button.config(state='normal'))
+        root.after(0, lambda: export_check.config(state='normal'))
+        return
+
+
+
     start_total = time.time()
 
     start_scan = time.time()
-    devices = scan_network("192.168.1.0/24")
+    devices = scan_network(str(ip_range_obj))
     end_scan = time.time()
     scan_duration = end_scan - start_scan
     print(f"scan_network took {scan_duration:.2f} seconds")
@@ -74,6 +92,7 @@ def run_scan():
         if export_var.get(): 
             filename = export_to_json(devices)
             messagebox.showinfo("Exported", f"Scan results saved to: \n{filename}")
+
 
         end_total = time.time()
         total_duration = end_total - start_total
@@ -102,6 +121,15 @@ scan_button.pack(side='left', padx=10)
 export_var = tk.BooleanVar()
 export_check = ttk.Checkbutton(top_frame, text="Export to JSON", variable=export_var)
 export_check.pack(side='left')
+
+# IP Range Input
+range_frame = ttk.Frame(root)
+range_frame.pack(pady=5)
+
+ttk.Label(range_frame, text="IP Range (CIDR):").pack(side='left')
+ip_range_var = tk.StringVar(value="192.168.1.0/24") # Default value
+ip_entry = ttk.Entry(range_frame, textvariable=ip_range_var, width=25)
+ip_entry.pack(side='left', padx=5)
 
 # Loading label
 loading_label = ttk.Label(root, text="", foreground="blue")

@@ -11,6 +11,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from main import scan_network, get_hostname, get_vendor
 
+previous_devices = set()
+
 def resolve_device_info(devices):
     def resolve(device):
         device['hostname'] = get_hostname(device['ip'])
@@ -68,10 +70,10 @@ def run_scan():
 
     start_total = time.time()
 
-    start_scan = time.time()
+    start_scan_time = time.time()
     devices = scan_network(str(ip_range_obj))
     end_scan = time.time()
-    scan_duration = end_scan - start_scan
+    scan_duration = end_scan - start_scan_time
     print(f"scan_network took {scan_duration:.2f} seconds")
 
     start_resolve = time.time()
@@ -81,6 +83,18 @@ def run_scan():
     print(f"Hostname/Vendor resolution took {resolve_duration:.2f} seconds")
 
     def update_gui():
+
+        global previous_devices
+        new_devices = set((d['ip'], d['mac']) for d in devices)
+
+        if previous_devices and (unknown := new_devices - previous_devices):
+            for ip, mac in unknown: 
+                hostname = get_hostname(ip)
+                vendor = get_vendor(mac)
+                messagebox.showwarning("New Device Detected", f"IP: {ip}\nMAC: {mac}\nHostname: {hostname}\nVendor: {vendor}")
+
+        previous_devices = new_devices
+
         for row in result_table.get_children():
             result_table.delete(row)
 
@@ -100,6 +114,9 @@ def run_scan():
         loading_label.config(text=f"Scan completed in {total_duration:.2f} seconds")
         scan_button.config(state='normal')
         export_check.config(state='normal')
+
+        if auto_var.get():
+            root.after(30000, start_scan) # Refresh after 30 seconds
 
         print(f"Total scan + resolve + update_gui time: {total_duration:.2f} seconds")
 
@@ -121,6 +138,11 @@ scan_button.pack(side='left', padx=10)
 export_var = tk.BooleanVar()
 export_check = ttk.Checkbutton(top_frame, text="Export to JSON", variable=export_var)
 export_check.pack(side='left')
+
+# Auto scan checkbox
+auto_var = tk.BooleanVar()
+auto_check = ttk.Checkbutton(top_frame, text="Auto-Scan", variable=auto_var)
+auto_check.pack(side='left')
 
 # IP Range Input
 range_frame = ttk.Frame(root)
